@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "blogapi2"
+version = "0.1.0"
+description = ""
+authors = ["IIH <ds5105119@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = {extras = ["standard"], version = "^0.114.1"}
+uvicorn = "^0.30.6"
+fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^13.0.0"}
+alembic = "^1.13.2"
+pydantic-settings = "^2.5.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
