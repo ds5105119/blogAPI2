@@ -7,13 +7,24 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-fastapi = {extras = ["standard"], version = "^0.114.1"}
-uvicorn = "^0.30.6"
-fastapi-users = {extras = ["oauth", "sqlalchemy"], version = "^13.0.0"}
+fastapi = {extras = ["standard"], version = "^0.115.2"}
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
 alembic = "^1.13.2"
 pydantic-settings = "^2.5.2"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+ruff = "^0.7.0"
+psycopg = {extras = ["binary"], version = "^3.2.3"}
 
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+lint.select = ["B", "C4", "E", "F", "N", "I", "W", "UP"]
+lint.ignore = ["F403","F405","E501","E402","B904"]
+lint.fixable = ["A", "B", "C", "D", "E", "F", "I", "UP"]
+lint.unfixable = []
+lint.per-file-ignores = {}
+line-length = 120
+target-version = "py39"
