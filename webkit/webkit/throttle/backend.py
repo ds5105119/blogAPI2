@@ -25,18 +25,18 @@ def _get_cookie_value(cookie: str, name) -> Optional[str]:
 class BaseBackend(ABC):
     @abstractmethod
     def authenticate(self, scope) -> Any | None:
-        pass
+        raise NotImplementedError
 
     @staticmethod
     @abstractmethod
     def _callback():
-        pass
+        raise NotImplementedError
 
 
 class BaseAnnoBackend(BaseBackend):
     @abstractmethod
     def verify_identity(self, *args, **kwargs) -> Any:
-        pass
+        raise NotImplementedError
 
 
 class IPBackend(BaseBackend):
@@ -59,24 +59,24 @@ class SessionBackend(BaseBackend):
     def get_session(self, scope):
         headers = scope.get("headers")
         if headers is None:
-            return False, None
+            return None
 
         cookie = _get_header_value(headers, "cookie")
         if cookie is None:
-            return False, None
+            return None
 
         session = _get_cookie_value(cookie, self.session_name)
         if session is None:
-            return False, None
+            return None
 
-        return True, session
+        return session
 
     def authenticate(self, scope) -> Any | None:
-        success, val = self.get_session(scope)
-        if not success:
+        session = self.get_session(scope)
+        if not session:
             return self._callback()
 
-        return val
+        return session
 
     @staticmethod
     def _callback():
@@ -133,36 +133,36 @@ class JWTBackend(BaseBackend):
     def get_token(self, scope):
         headers = scope.get("headers")
         if headers is None:
-            return False, None
+            return None
 
         authorization_value = _get_header_value(headers, "authorization")
         if authorization_value is None:
-            return False, None
+            return None
 
         scheme, param = self._get_authorization_scheme_param(authorization_value)
         if scheme.lower() != "bearer" or not param:
-            return False, None
+            return None
 
-        return True, (scheme, param)
+        return scheme, param
 
     def check_token(self, token):
         validated_token = self.jwt_service.check_access_token_expired(access_token=token)
 
         if validated_token is None:
-            return False, None
+            return None
 
-        return True, validated_token
+        return validated_token
 
     def authenticate(self, scope) -> Any | None:
-        success, val = self.get_token(scope)
-        if not success:
+        token_data = self.get_token(scope)
+        if token_data is None:
             return self._callback()
 
-        success, val = self.check_token(val[1])
-        if not success:
+        validated_token = self.check_token(token_data[1])
+        if validated_token is None:
             return self._callback()
 
-        return val
+        return validated_token
 
     @staticmethod
     def _callback():

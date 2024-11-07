@@ -1,13 +1,12 @@
-from typing import Callable, Iterable, Literal, Optional
+from typing import Callable, Iterable, Optional
 
 from starlette.routing import BaseRoute, Match
-from starlette.types import Scope
 
 from webkit.throttle.backend import AnnoSessionBackend, BaseAnnoBackend, BaseBackend
 from webkit.throttle.limiter import Limiter, Rule
 
 
-def _find_route_handler(routes: Iterable[BaseRoute], scope: Scope) -> Optional[Callable]:
+def _find_route_handler(routes: Iterable[BaseRoute], scope) -> Optional[Callable]:
     for route in routes:
         match, _ = route.matches(scope)
         if match == Match.FULL and hasattr(route, "endpoint"):

@@ -1,23 +1,6 @@
-import asyncio
 import time
 
 import pytest
-import pytest_asyncio
-
-from app.core.config import settings
-from webkit.auth import JWTService
-from webkit.cache import RedisClient
-
-
-@pytest_asyncio.fixture(scope="session")
-async def jwt_service():
-    client = RedisClient(settings.REDIS_DSN)
-    service = JWTService(client, secret_key="test")
-
-    try:
-        yield service
-    finally:
-        await client.aclose()
 
 
 @pytest.mark.asyncio(scope="session")
