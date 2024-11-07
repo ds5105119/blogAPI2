@@ -21,3 +21,20 @@ services:
       resources:
         limits:
           memory: 256m
+
+  valkey:
+    image: valkey/valkey:alpine
+    container_name: tangerine_api_valkey
+    restart: always
+    command: >
+      valkey-server
+      --port ${REDIS_PORT}
+      --maxmemory 200mb
+      --maxmemory-policy allkeys-lfu
+      --maxclients 50000
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    deploy:
+      resources:
+        limits:
+          memory: 256m

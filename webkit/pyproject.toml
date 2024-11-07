@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "blogapi2"
+name = "webkit"
 version = "0.1.0"
 description = ""
 authors = ["IIH <ds5105119@gmail.com>"]
@@ -7,13 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-fastapi = {extras = ["standard"], version = "^0.115.2"}
-uvicorn = {extras = ["standard"], version = "^0.32.0"}
-alembic = "^1.13.2"
-pydantic-settings = "^2.5.2"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
-ruff = "^0.7.0"
-psycopg = {extras = ["binary"], version = "^3.2.3"}
 redis = {extras = ["hiredis"], version = "^5.1.1"}
 msgspec = "^0.18.6"
 blake3 = "^0.4.1"
@@ -26,15 +20,6 @@ pytest-asyncio = "^0.24.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.ruff]
-lint.select = ["B", "C4", "E", "F", "N", "I", "W", "UP"]
-lint.ignore = ["F403","F405","E501","E402","B904"]
-lint.fixable = ["A", "B", "C", "D", "E", "F", "I", "UP"]
-lint.unfixable = []
-lint.per-file-ignores = {}
-line-length = 120
-target-version = "py39"
 
 
 [tool.pytest.ini_options]
