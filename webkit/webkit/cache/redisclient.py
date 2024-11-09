@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, Awaitable, Optional, Union
 
 from redis.asyncio.client import Redis
-from redis.asyncio.connection import ConnectionPool, parse_url
+from redis.asyncio.connection import ConnectionPool
 from redis.asyncio.retry import Retry
 from redis.backoff import default_backoff
 from redis.exceptions import BusyLoadingError, ConnectionError, RedisError
@@ -30,7 +30,7 @@ class BaseRedisClient(ABC):
     async def lock(
         self,
         key: Union[bytes, str, memoryview],
-        ttl_ms: Union[int, timedelta, None] = 200,
+        ttl_ms: Union[int, timedelta, None] = 100,
         blocking: bool = True,
         blocking_timeout: float = DEFAULT_CAP,
         blocking_sleep: float = DEFAULT_BASE,
@@ -94,15 +94,16 @@ class RedisConfig:
     username: Optional[str] = None
     password: Optional[str] = None
     health_check_interval: int = 0
-    socket_timeout: float = 0.2
-    socket_connect_timeout: float = 1.0
+    socket_timeout: float = 0.5
+    socket_connect_timeout: float = 2.0
     socket_keepalive: bool = True
-    retry: Optional[Retry] = Retry(default_backoff(), retries=2)
+    retry: Optional[Retry] = Retry(default_backoff(), retries=3)
     retry_on_error: Optional[list[type[Exception]]] = field(
         default_factory=lambda: [BusyLoadingError, ConnectionError, RedisError, OSError]
     )
     retry_on_timeout: bool = True
     ssl: bool = False
+    max_connections: Optional[int] = None
     protocol: Optional[int] = 3
 
     def to_dict(self) -> dict[str, Any]:
@@ -149,7 +150,7 @@ class RedisClient(BaseRedisClient):
     def lock(
         self,
         key: Union[bytes, str, memoryview],
-        ttl_ms: Union[int, timedelta, None] = 200,
+        ttl_ms: Union[int, timedelta, None] = 100,
         blocking: bool = True,
         blocking_timeout: float = DEFAULT_CAP,
         blocking_sleep: float = DEFAULT_BASE,
@@ -162,7 +163,7 @@ class RedisClient(BaseRedisClient):
         value: Union[bytes, memoryview, str, int, float],
         ex: Union[int, timedelta, None] = None,
         exat: Union[int, datetime, None] = None,
-        ttl_ms: Union[int, timedelta, None] = 1,
+        ttl_ms: Union[int, timedelta, None] = 10,
     ) -> Union[Awaitable, Any]:
         async with self.lock(key, ttl_ms, True):
             return await self.redis.set(key, value, ex=ex, exat=exat, nx=True)

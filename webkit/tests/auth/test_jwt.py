@@ -1,4 +1,6 @@
+import asyncio
 import time
+from uuid import uuid4
 
 import pytest
 
@@ -27,6 +29,27 @@ async def test_update_token(jwt_service):
 
     new_access_token, new_refresh_token = await jwt_service.update_token(token_data, access_token, refresh_token)
     time.sleep(1)
+
+    async def create_worker():
+        data = {"sub": uuid4().hex}
+        access = jwt_service.create_access_token(data)
+        refresh = await jwt_service.create_refresh_token(data, access)
+        return data, access, refresh
+
+    async def update_worker(data, access, refresh):
+        return await jwt_service.update_token(data, access, refresh)
+
+    t = time.time()
+    tokens = await asyncio.gather(*[create_worker() for _ in range(1000)])
+    d = time.time() - t
+    assert d < 2
+    print(f"\n리프레시 토큰 발급 소요 시간: {d}sec")
+
+    t = time.time()
+    tokens = await asyncio.gather(*[update_worker(*args) for args in tokens])
+    d = time.time() - t
+    assert d < 2
+    print(f"\n토큰 업데이트 소요 시간: {d}sec")
 
     try:
         _ = await jwt_service.update_token(token_data, access_token, refresh_token)

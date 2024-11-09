@@ -5,7 +5,15 @@ from uuid import uuid4
 from webkit.auth.service import BaseJWTService
 
 
-def _get_header_value(header, name) -> Optional[str]:
+def _get_header_value(header, name: str) -> Optional[str]:
+    """
+    Extracts a specific header value from HTTP headers.
+
+    :param header: HTTP header dictionary
+    :param name: Name of the header to find
+    :return: Header value or None
+    """
+
     header = {key.decode("utf-8").lower(): val for key, val in header}
     val = header.get(name)
 
@@ -15,7 +23,15 @@ def _get_header_value(header, name) -> Optional[str]:
     return val.decode("utf-8")
 
 
-def _get_cookie_value(cookie: str, name) -> Optional[str]:
+def _get_cookie_value(cookie: str, name: str) -> Optional[str]:
+    """
+    Extracts a specific cookie value from a cookie string.
+
+    :param cookie: Cookie string (e.g., "name1=value1; name2=value2")
+    :param name: Name of the cookie to find
+    :return: Cookie value or None
+    """
+
     cookie = dict(c.split("=") for c in cookie.split("; "))
     val = cookie.get(name)
 
@@ -23,40 +39,115 @@ def _get_cookie_value(cookie: str, name) -> Optional[str]:
 
 
 class BaseBackend(ABC):
+    """
+    Abstract base class for authentication backends.
+    All authentication backends must inherit from this class.
+    """
+
     @abstractmethod
     def authenticate(self, scope) -> Any | None:
+        """
+        Performs authentication using the request scope.
+
+        :param scope: ASGI request scope
+        :return: Authentication data or None
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_identifier(self, authenticate_data: Any) -> str:
+        """
+        Extracts a unique identifier from the authenticated data.
+
+        :param authenticate_data: Data returned from authenticate() method
+        :return: String identifier
+        """
+
         raise NotImplementedError
 
     @staticmethod
     @abstractmethod
     def _callback():
+        """
+        Callback method called when authentication fails
+        """
+
         raise NotImplementedError
 
 
 class BaseAnnoBackend(BaseBackend):
+    """
+    Base backend class for handling anonymous users
+    """
+
     @abstractmethod
     def verify_identity(self, *args, **kwargs) -> Any:
+        """
+        Method to verify the identity of anonymous users
+        """
+
         raise NotImplementedError
 
 
 class IPBackend(BaseBackend):
+    """
+    Authentication backend based on IP address
+    """
+
     def authenticate(self, scope) -> Any | None:
+        """
+        Performs authentication using the client's IP address.
+
+        :param scope: ASGI request scope
+        :return: IP address or None
+        """
+
         client = scope.get("client")
         if client is None:
             return self._callback()
 
         return client[0]
 
+    def get_identifier(self, authenticate_data: Any) -> str:
+        """
+        Returns IP address as identifier.
+
+        :param authenticate_data: IP address
+        :return: IP address string
+        """
+
+        return authenticate_data
+
     @staticmethod
     def _callback():
+        """
+        Returns None when IP authentication fails.
+        """
+
         return None
 
 
 class SessionBackend(BaseBackend):
+    """
+    Session-based authentication backend
+    """
+
     def __init__(self, session_name: str):
+        """
+        :param session_name: Name of the session cookie
+        """
+
         self.session_name = session_name
 
     def get_session(self, scope):
+        """
+        Extracts session information from request scope.
+
+        :param scope: ASGI request scope
+        :return: Session value or None
+        """
+
         headers = scope.get("headers")
         if headers is None:
             return None
@@ -72,18 +163,44 @@ class SessionBackend(BaseBackend):
         return session
 
     def authenticate(self, scope) -> Any | None:
+        """
+        Performs authentication using session information.
+
+        :param scope: ASGI request scope
+        :return: Session information or None
+        """
+
         session = self.get_session(scope)
         if not session:
             return self._callback()
 
         return session
 
+    def get_identifier(self, authenticate_data: Any) -> str:
+        """
+        Uses session information as identifier.
+
+        :param authenticate_data: Session information
+        :return: Session string
+        """
+
+        return authenticate_data
+
     @staticmethod
     def _callback():
+        """
+        Returns None when session authentication fails.
+        """
+
         return None
 
 
 class AnnoSessionBackend(SessionBackend, BaseAnnoBackend):
+    """
+    Session backend for anonymous users.
+    Automatically creates and assigns new sessions.
+    """
+
     def __init__(
         self,
         session_name,
@@ -92,6 +209,14 @@ class AnnoSessionBackend(SessionBackend, BaseAnnoBackend):
         same_site: Literal["lax", "strict", "none"] | None = "lax",
         session_factory: Optional[Callable] = uuid4,
     ):
+        """
+        :param session_name: Name of the session cookie
+        :param max_age: Session expiration time (seconds)
+        :param secure: HTTPS only flag
+        :param same_site: SameSite cookie policy
+        :param session_factory: Session ID generation function
+        """
+
         super().__init__(session_name)
 
         self.session_factory = session_factory
@@ -100,6 +225,13 @@ class AnnoSessionBackend(SessionBackend, BaseAnnoBackend):
             self.security_flags += f" secure;"
 
     async def verify_identity(self, scope, send):
+        """
+        Assigns new session to anonymous users and redirects.
+
+        :param scope: ASGI request scope
+        :param send: ASGI send function
+        """
+
         await send(
             {
                 "type": "http.response.start",
@@ -117,13 +249,28 @@ class AnnoSessionBackend(SessionBackend, BaseAnnoBackend):
 
 
 class JWTBackend(BaseBackend):
+    """
+    JWT (JSON Web Token) based authentication backend
+    """
+
     def __init__(self, jwt_service: "BaseJWTService"):
+        """
+        :param jwt_service: Service object for JWT processing
+        """
+
         self.jwt_service = jwt_service
 
     @staticmethod
     def _get_authorization_scheme_param(
         authorization_header_value: Optional[str],
     ) -> Tuple[str, str]:
+        """
+        Separates scheme and token from Authorization header.
+
+        :param authorization_header_value: Authorization header value
+        :return: (scheme, token) tuple
+        """
+
         if not authorization_header_value:
             return "", ""
         scheme, _, param = authorization_header_value.partition(" ")
@@ -131,6 +278,13 @@ class JWTBackend(BaseBackend):
         return scheme, param
 
     def get_token(self, scope):
+        """
+        Extracts JWT from request scope.
+
+        :param scope: ASGI request scope
+        :return: (scheme, token) tuple or None
+        """
+
         headers = scope.get("headers")
         if headers is None:
             return None
@@ -145,7 +299,14 @@ class JWTBackend(BaseBackend):
 
         return scheme, param
 
-    def check_token(self, token):
+    def validate_token(self, token):
+        """
+        Validates JWT.
+
+        :param token: JWT string
+        :return: Validated token data or None
+        """
+
         validated_token = self.jwt_service.check_access_token_expired(access_token=token)
 
         if validated_token is None:
@@ -154,16 +315,37 @@ class JWTBackend(BaseBackend):
         return validated_token
 
     def authenticate(self, scope) -> Any | None:
+        """
+        Performs authentication using JWT.
+
+        :param scope: ASGI request scope
+        :return: Validated token data or None
+        """
+
         token_data = self.get_token(scope)
         if token_data is None:
             return self._callback()
 
-        validated_token = self.check_token(token_data[1])
+        validated_token = self.validate_token(token_data[1])
         if validated_token is None:
             return self._callback()
 
         return validated_token
 
+    def get_identifier(self, authenticate_data: Any) -> str:
+        """
+        Extracts JTI (JWT ID) from JWT claims.
+
+        :param authenticate_data: JWT claims data
+        :return: JTI string
+        """
+
+        return authenticate_data.get("jti")
+
     @staticmethod
     def _callback():
+        """
+        Returns None when JWT authentication fails.
+        """
+
         return None

@@ -31,7 +31,8 @@ class BaseJWTManager(ABC):
 
         :raises NotImplementedError: If this method is not implemented in a subclass.
         """
-        raise NotImplementedError("subclasses of AbstractJWTManager must provide a encode() method")
+
+        raise NotImplementedError
 
     @abstractmethod
     def decode(
@@ -50,7 +51,8 @@ class BaseJWTManager(ABC):
 
         :raises NotImplementedError: If this method is not implemented in a subclass.
         """
-        raise NotImplementedError("subclasses of AbstractJWTManager must provide a decode() method")
+
+        raise NotImplementedError
 
 
 class JWTManager(BaseJWTManager):
@@ -85,6 +87,7 @@ class JWTManager(BaseJWTManager):
         :return: A dictionary containing the claims if the token is valid,
                  or None if the token is invalid or expired.
         """
+
         try:
             options = {
                 "verify_signature": True,

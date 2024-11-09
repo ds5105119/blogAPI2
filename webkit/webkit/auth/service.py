@@ -55,6 +55,7 @@ class JWTService(BaseJWTService):
 
         :return: JWT ID (jti),
         """
+
         return uuid4().hex
 
     def _create_token_metadata(self, data: dict, ttl: float) -> TokenData:
