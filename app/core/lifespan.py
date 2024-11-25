@@ -7,12 +7,11 @@ from fastapi import FastAPI
 async def lifespan(app: FastAPI):
     # app start
     try:
-        print("앱 실행")
+        pass
     except Exception as e:
-        print(f"DB Connection Failed: {e}")
         raise e
-
-    yield
+    finally:
+        yield
 
     # app shutdown
     print("Application Stopped")

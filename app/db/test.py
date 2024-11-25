@@ -36,7 +36,7 @@ with engine.connect() as conn:
     stmt = insert(User).values(
         [
             {"name": "spongebob", "fullname": "Spongebob Squarepants"},
-            {"name": "sex", "fullname": "sex king"},
+            {"name": "abc", "fullname": "abc"},
         ]
     )
     result = conn.execute(stmt)
@@ -44,7 +44,7 @@ with engine.connect() as conn:
 
 
 with engine.connect() as conn:
-    stmt = select(User).where(User.name == "sex")
+    stmt = select(User).where(User.name == "spongebob")
     result = conn.execute(stmt)
 
     x = next(result)

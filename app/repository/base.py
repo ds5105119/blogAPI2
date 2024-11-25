@@ -1,3 +1,4 @@
+from sqlite3 import IntegrityError
 from typing import Any, Generic, Iterable, Sequence, Type, TypeVar, cast
 
 from sqlalchemy import UUID, Column, Label, MetaData, Result, Row, delete, func, insert, select, update
@@ -22,17 +23,25 @@ class BaseRepository[T]:
 
 
 class BaseCreateRepository[T](BaseRepository[T]):
-    async def create(self, session: AsyncSession, **kwargs) -> T:
+    async def _create(self, session: AsyncSession, **kwargs: Any) -> T:
         session.add(entity := self.model(**kwargs))
         await session.commit()
         await session.refresh(entity)
 
         return entity
 
-    async def bulk_create(self, session: AsyncSession, **kwargs) -> None:
-        stmt = insert(self.model).values(**kwargs)
+    async def _bulk_create(self, session: AsyncSession, kwargs: Sequence[dict[str, Any]]) -> None:
+        stmt = insert(self.model).values(kwargs)
         await session.execute(stmt)
         await session.commit()
+
+    async def create(self, session: AsyncSession, *args: Any, **kwargs: Any) -> T | None:
+        if args:
+            return await self._bulk_create(session, list(args))
+        elif kwargs:
+            return await self._create(session, **kwargs)
+        else:
+            raise ValueError("Invalid arguments for creation.")
 
 
 class BaseReadRepository[T](BaseRepository[T]):
