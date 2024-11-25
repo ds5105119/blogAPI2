@@ -1,19 +1,38 @@
-from fastapi import APIRouter, status
+from typing import Optional
 
-from webkit.throttle.decorator import limiter
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.security import OAuth2AuthorizationCodeBearer, OAuth2PasswordBearer
+from webtool.throttle.decorator import limiter
+
+from app.dependencies.services import jwt_service
 
 router = APIRouter()
 
 
-# 일반 유저의 경우
-@limiter(20, 20)
-@router.get("/", status_code=status.HTTP_200_OK)
-async def abc():
-    return {"ok": "아무응답"}
+class ExtendOAuth2PasswordBearer(OAuth2PasswordBearer):
+    async def __call__(self, request: Request) -> Optional[str]:
+        auth = request.scope.get("auth")
+        return auth
 
 
+class ExtendOAuth2AuthorizationCodeBearer(OAuth2AuthorizationCodeBearer):
+    async def __call__(self, request: Request) -> Optional[str]:
+        auth = request.scope.get("auth")
+        return auth
+
+
+oauth_password_schema = ExtendOAuth2PasswordBearer(tokenUrl="api/v1/token")
+
+
+@router.get("/token/", status_code=status.HTTP_200_OK)
+async def get_token():
+    tokens = await jwt_service.create_token({"sub": "123"})
+
+    return tokens
+
+
+# 유저에게만 스로틀을 걸기
 @limiter(10, 100)
 @router.get("/new/", status_code=status.HTTP_200_OK)
-@limiter(10, 100)
-async def z():
-    return {"이건 또 다른 api": "아무 출력"}
+async def auth_info(auth=Depends(oauth_password_schema)):
+    return {"auth_info 응답": auth}

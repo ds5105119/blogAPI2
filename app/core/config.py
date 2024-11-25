@@ -1,68 +1,68 @@
 from pathlib import Path
-from typing import List
+from typing import Annotated, List
 
 from pydantic import BaseModel, Field, PostgresDsn, RedisDsn
-from pydantic_core import MultiHostUrl, Url
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class OAuthConfig(BaseModel):
-    CLIENT_ID: str
-    SECRET_KEY: str
-    REDIRECT_URI: str
-
-
 class DataBaseConfig(BaseModel):
-    DB: str = Field(serialization_alias="path")
-    HOST: str = Field(serialization_alias="host")
-    PORT: int = Field(serialization_alias="port")
-    USER: str = Field(default="", serialization_alias="username")
-    PASSWORD: str = Field(default="", serialization_alias="password")
+    db: Annotated[str, Field(serialization_alias="path")]
+    host: Annotated[str, Field(serialization_alias="host")]
+    port: Annotated[int, Field(serialization_alias="port")]
+    user: Annotated[str, Field(default="", serialization_alias="username")]
+    password: Annotated[str, Field(default="", serialization_alias="password")]
 
 
 class JWT(BaseModel):
-    ALGORITHM: str = Field(default="ES384")
-    ACCESS_TOKEN_EXPIRE_TIME: int = Field(default=60 * 60)
-    REFRESH_TOKEN_EXPIRE_TIME: int = Field(default=60 * 60 * 24 * 7)
+    algorithm: Annotated[str, Field(default="ES384")]
+    access_token_expire_time: Annotated[int, Field(default=3600)]
+    refresh_token_expire_time: Annotated[int, Field(default=604800)]
+
+
+class OAuthConfig(BaseModel):
+    client_id: str
+    secret_key: str
+    redirect_uri: str
 
 
 class AWS(BaseModel):
-    ACCESS_KEY_ID: str
-    SECRET_ACCESS_KEY: str
-    STORAGE_BUCKET_NAME: str
-    S3_REGION_NAME: str
+    access_key_id: str
+    secret_access_key: str
+    storage_bucket_name: str
+    s3_region_name: str
 
 
 class Settings(BaseSettings):
-    BASE_DIR: Path = Path(__file__).resolve().parent.parent.parent
-    SECRET_KEY: str = Field(default="YtGHVqSAzFyaHk2OV5XQg3")
-    BASE_URL: str = Field(default="http://localhost:8000")
+    base_dir: Path = Path(__file__).resolve().parent.parent.parent
+    base_url: Annotated[str, Field(default="http://localhost:8000")]
+    secret_key: Annotated[str, Field(default="YtGHVqSAzFyaHk2OV5XQg3")]
 
-    CORS_ALLOWED_ORIGINS: List[str] = Field(default_factory=list, frozen=True)
-    ALLOWED_HOSTS: List[str] = Field(default_factory=list, frozen=True)
+    cors_allow_origin: List[str] = Field(default_factory=list, frozen=True)
+    allowed_hosts: List[str] = Field(default_factory=list, frozen=True)
 
-    PROJECT_NAME: str = Field(default="API")
-    API_URL: str = Field(default="/api")
-    SWAGGER_URL: str = Field(default="/api")
+    project_name: Annotated[str, Field(default="API")]
+    api_url: Annotated[str, Field(default="/api")]
+    swagger_url: Annotated[str, Field(default="/api")]
 
-    AWS: AWS
-    OAUTH_GOOGLE: OAuthConfig
+    jwt: Annotated[JWT, Field(default_factory=JWT)]
+    postgres: DataBaseConfig
+    redis: DataBaseConfig
 
-    POSTGRES: DataBaseConfig
-    REDIS: DataBaseConfig
-
-    @property
-    def POSTGRES_DSN(self) -> MultiHostUrl:
-        return PostgresDsn.build(scheme="postgresql+psycopg", **self.POSTGRES.model_dump(by_alias=True))
+    aws: AWS
+    oauth_google: OAuthConfig
 
     @property
-    def REDIS_DSN(self) -> Url:
-        return RedisDsn.build(scheme="redis", **self.REDIS.model_dump(by_alias=True))
+    def postgres_dsn(self) -> PostgresDsn:
+        return PostgresDsn.build(scheme="postgresql+psycopg", **self.postgres.model_dump(by_alias=True))
+
+    @property
+    def redis_dsn(self) -> RedisDsn:
+        return RedisDsn.build(scheme="redis", **self.redis.model_dump(by_alias=True))
 
     model_config = SettingsConfigDict(
-        env_file=str(BASE_DIR / ".env"),
+        env_file=str(base_dir / ".env"),
         env_file_encoding="utf-8",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="allow",
         env_nested_delimiter="__",
     )

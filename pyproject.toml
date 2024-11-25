@@ -11,19 +11,14 @@ fastapi = {extras = ["standard"], version = "^0.115.2"}
 uvicorn = {extras = ["standard"], version = "^0.32.0"}
 alembic = "^1.13.2"
 pydantic-settings = "^2.5.2"
-python-jose = {extras = ["cryptography"], version = "^3.3.0"}
-ruff = "^0.7.0"
+ruff = "*"
 psycopg = {extras = ["binary"], version = "^3.2.3"}
-redis = {extras = ["hiredis"], version = "^5.1.1"}
-msgspec = "^0.18.6"
-blake3 = "^0.4.1"
-argon2-cffi = "^23.1.0"
 coverage = "^7.6.4"
+webtool = "^0.0.9"
 
 
 [tool.poetry.group.dev.dependencies]
 pytest-asyncio = "^0.24.0"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

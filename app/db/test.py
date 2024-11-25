@@ -33,12 +33,19 @@ class Address(Base):
 Base.metadata.create_all(engine)
 
 with engine.connect() as conn:
-    stmt = insert(User).values(name="spongebob", fullname="Spongebob Squarepants")
+    stmt = insert(User).values(
+        [
+            {"name": "spongebob", "fullname": "Spongebob Squarepants"},
+            {"name": "sex", "fullname": "sex king"},
+        ]
+    )
     result = conn.execute(stmt)
     conn.commit()
 
 
 with engine.connect() as conn:
-    stmt = select(User.name).where(User.name == "spongebob")
+    stmt = select(User).where(User.name == "sex")
     result = conn.execute(stmt)
-    print(result.fetchall())
+
+    x = next(result)
+    print(x)
