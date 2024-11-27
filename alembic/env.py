@@ -1,25 +1,24 @@
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
-from sqlalchemy.ext.declarative import declarative_base
 
 from alembic import context
-from app.core.config import settings
+from src.core.config import settings
+from src.core.models.model import metadata
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 if not config.get_main_option("sqlalchemy.url"):
-    config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_POSTGRES_URI.unicode_string())
+    config.set_main_option("sqlalchemy.url", settings.postgres_dsn.unicode_string().replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-Base = declarative_base()
-target_metadata = Base.metadata
+target_metadata = metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

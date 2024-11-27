@@ -51,7 +51,7 @@ class BaseReadRepository[T](BaseRepository[T]):
 
         return result
 
-    async def filter_get(self, session: Session, filters: list, columns: list[str] | None = None) -> _P:
+    async def get_by_where(self, session: Session, filters: Sequence, columns: list[str] | None = None) -> _P:
         columns = self.get_columns(columns)
         stmt = select(*columns).where(*filters)
         result = await session.execute(stmt)

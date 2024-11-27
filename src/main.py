@@ -5,11 +5,11 @@ from starlette.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from webtool.throttle import LimitMiddleware
 
-from app.api.v1.api import router
-from app.core.config import settings
-from app.core.lifespan import lifespan
-from app.dependencies.db import Redis
-from app.dependencies.services import jwt_backend
+from src.app.router import router
+from src.core.config import settings
+from src.core.dependencies.auth import jwt_backend
+from src.core.dependencies.db import Redis
+from src.core.lifespan import lifespan
 
 
 def create_application(dev=False) -> FastAPI:

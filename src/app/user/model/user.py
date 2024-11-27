@@ -1,31 +1,15 @@
 import datetime
-from typing import List, Optional
+from typing import Optional
 
-from sqlalchemy import (
-    JSONB,
-    Boolean,
-    DateTime,
-    ForeignKeyConstraint,
-    Index,
-    Integer,
-    PrimaryKeyConstraint,
-    String,
-    func,
-)
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKeyConstraint, Index, Integer, PrimaryKeyConstraint, String, func
+from sqlalchemy.ext.mutable import MutableSet
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base
+from src.core.models.base import Base
 
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = (
-        PrimaryKeyConstraint("id", name="users_pk"),
-        Index("ix_users_email", "email", unique=True),
-        Index("ix_users_handle", "handle", unique=True),
-        Index("ix_users_is_active", "is_active"),
-        Index("ix_users_is_deleted", "is_deleted"),
-    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
@@ -34,7 +18,9 @@ class User(Base):
     password: Mapped[str] = mapped_column(String(255))
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime, onupdate=func.now())
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
     deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -54,9 +40,10 @@ class Profile(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    user_id: Mapped[int] = mapped_column(Integer)
 
     profile: Mapped[str] = mapped_column(String(255))
     bio: Mapped[Optional[str]] = mapped_column(String(255))
+    link: Mapped[Optional[list]] = mapped_column(MutableSet.as_mutable(JSON))
 
     users: Mapped["User"] = relationship("User", back_populates="profiles")

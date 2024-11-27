@@ -1,7 +1,6 @@
 from webtool.auth import JWTBackend, RedisJWTService
 
-from app.core.config import settings
-from app.dependencies.db import Redis
+from .db import Redis, settings
 
 jwt_service = RedisJWTService(
     Redis,
