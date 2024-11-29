@@ -12,11 +12,11 @@ from src.core.dependencies.db import Redis
 from src.core.lifespan import lifespan
 
 
-def create_application(dev=False) -> FastAPI:
+def create_application(debug=False) -> FastAPI:
     middleware = [
         Middleware(
             CORSMiddleware,  # type: ignore
-            allow_origins=settings.cors_allow_origin if not dev else ["*"],
+            allow_origins=settings.cors_allow_origin if not debug else ["*"],
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
@@ -48,7 +48,7 @@ def create_application(dev=False) -> FastAPI:
     return application
 
 
-app = create_application(dev=True)
+app = create_application(debug=settings.debug)
 
 
 if __name__ == "__main__":

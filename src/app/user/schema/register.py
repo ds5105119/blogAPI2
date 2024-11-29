@@ -2,7 +2,7 @@ from argon2 import PasswordHasher
 from pydantic import BaseModel, EmailStr, Field, field_serializer, field_validator, model_validator
 from typing_extensions import Self
 
-hasher = PasswordHasher()
+ph = PasswordHasher()
 
 
 class HandleDto(BaseModel):
@@ -34,6 +34,7 @@ class RegisterDto(HandleDto, EmailDto):
             raise ValueError("passwords do not match")
         return self
 
-    @field_serializer("password1")
-    def hash_password(self, password1: str) -> str:
-        return hasher.hash(password1)
+
+class RegisterResponse(BaseModel):
+    access: str
+    refresh: str | None

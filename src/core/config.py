@@ -34,6 +34,8 @@ class AWS(BaseModel):
 
 class Settings(BaseSettings):
     base_dir: Path = Path(__file__).resolve().parent.parent.parent
+
+    debug: Annotated[bool, Field(default=False)]
     base_url: Annotated[str, Field(default="http://localhost:8000")]
     secret_key: Annotated[str, Field(default="YtGHVqSAzFyaHk2OV5XQg3")]
 

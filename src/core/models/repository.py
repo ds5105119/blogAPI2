@@ -1,6 +1,6 @@
 from typing import Any, Sequence, TypeVar, cast
 
-from sqlalchemy import Column, Label, Result, Row, delete, func, insert, select, update
+from sqlalchemy import Result, delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession as Session
 from sqlalchemy.orm import DeclarativeBase
 
@@ -10,7 +10,7 @@ _P = Result[tuple[Any]]
 
 class BaseRepository[T]:
     model: type[T]
-    session: Session
+    session: type[Session]
 
     def __init__(self, model: type[T]):
         self.model = model
@@ -44,51 +44,48 @@ class BaseCreateRepository[T](BaseRepository[T]):
 
 
 class BaseReadRepository[T](BaseRepository[T]):
-    async def get(self, session: Session, id: int | str, columns: list[str] | None = None) -> _P:
-        columns = self.get_columns(columns)
-        stmt = select(*columns).where(cast("ColumnElement[bool]", self.model.id == id))
-        result = await session.execute(stmt)
-
-        return result
-
-    async def get_by_where(self, session: Session, filters: Sequence, columns: list[str] | None = None) -> _P:
+    async def get(self, session: Session, filters: Sequence, columns: list[str] | None = None) -> _P:
         columns = self.get_columns(columns)
         stmt = select(*columns).where(*filters)
         result = await session.execute(stmt)
 
         return result
 
+    async def get_by_id(self, session: Session, id: int | str, columns: list[str] | None = None) -> _P:
+        columns = self.get_columns(columns)
+        stmt = select(*columns).where(cast("ColumnElement[bool]", self.model.id == id))
+        result = await session.execute(stmt)
+
+        return result
+
 
 class BaseUpdateRepository[T](BaseRepository[T]):
-    async def update(self, db: Session, id: int | str, **kwargs) -> None:
-        query = update(self.model).where(cast("ColumnElement[bool]", self.model.id == id)).values(**kwargs)
+    async def filter(self, db: Session, filters: Sequence, **kwargs) -> None:
+        query = update(self.model).where(*filters).values(**kwargs)
         await db.execute(query)
         await db.commit()
 
-    async def filter_update(self, db: Session, filters: list, **kwargs) -> None:
-        query = update(self.model).where(*filters).values(**kwargs)
+    async def update_by_id(self, db: Session, id: int | str, **kwargs) -> None:
+        query = update(self.model).where(cast("ColumnElement[bool]", self.model.id == id)).values(**kwargs)
         await db.execute(query)
         await db.commit()
 
 
 class BaseDeleteRepository[T](BaseRepository[T]):
-    async def _delete_single(self, db: Session, id: int | str) -> None:
+    async def _delete(self, db: Session, id: int | str) -> None:
         stmt = delete(self.model).where(cast("ColumnElement[bool]", self.model.id == id))
         await db.execute(stmt)
         await db.commit()
 
-    async def _delete_multiple(self, db: Session, ids: list[int | str]) -> None:
-        if not ids:
-            return
-
+    async def _bulk_delete(self, db: Session, ids: list[int | str]) -> None:
         stmt = delete(self.model).where(cast("ColumnElement[bool]", self.model.id.in_(ids)))
         await db.execute(stmt)
         await db.commit()
 
     async def delete(self, db: Session, id: int | str | tuple[int | str] | list[int | str]) -> None:
         if isinstance(id, (int, str)):
-            await self._delete_single(db, id)
+            await self._delete(db, id)
         elif isinstance(id, (tuple, list)) and len(id):
-            await self._delete_multiple(db, list(id))
+            await self._bulk_delete(db, list(id))
         else:
             raise ValueError("'id' must be an int, str, or Iterable of int or str")

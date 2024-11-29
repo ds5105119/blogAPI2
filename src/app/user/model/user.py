@@ -13,14 +13,13 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    email: Mapped[str] = mapped_column(String(255))
-    handle: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str] = mapped_column(String(255), unique=True)
+    handle: Mapped[str] = mapped_column(String(255), unique=True)
     password: Mapped[str] = mapped_column(String(255))
+    birthday: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
 
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(
-        DateTime, server_default=func.now(), onupdate=func.now()
-    )
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, onupdate=func.now())
     deleted_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
