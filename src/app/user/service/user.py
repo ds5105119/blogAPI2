@@ -5,7 +5,6 @@ from webtool.auth import JWTService
 
 from src.app.user.repository.user import UserRepository, user_repository
 from src.app.user.schema import login, register
-from src.core.dependencies.auth import jwt_service
 from src.core.dependencies.auth import jwt_service as default_jwt_service
 
 
@@ -23,7 +22,7 @@ class UserService:
 
     async def _issue_tokens(self, db_user):
         payload = self._user_to_claim(db_user)
-        return await jwt_service.create_token(payload)
+        return await self.jwt_service.create_token(payload)
 
     async def _is_register_valid(self, data: register.RegisterDto, session: Session):
         user = await self.repository.get_unique_fields(session, data.email, data.handle)
