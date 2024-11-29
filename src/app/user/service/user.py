@@ -21,10 +21,23 @@ class UserService:
         }
 
     async def _issue_tokens(self, db_user):
+        """
+        Parameters:
+            db_user: 유저 데이터. PK 필수
+
+        Returns: access, refresh 토큰 (Webtool)
+        """
         payload = self._user_to_claim(db_user)
         return await self.jwt_service.create_token(payload)
 
     async def _is_register_valid(self, data: register.RegisterDto, session: Session):
+        """
+        Parameters:
+            data: register.RegisterDto
+            session: Session
+
+        Returns: 읽은 유저 데이터
+        """
         user = await self.repository.get_unique_fields(session, data.email, data.handle)
 
         if user.all():
@@ -36,6 +49,13 @@ class UserService:
         return user
 
     async def _is_login_valid(self, data: login.LoginDto, session: Session):
+        """
+        Parameters:
+            data: login.LoginDto
+            session: Session
+
+        Returns: 읽은 유저 데이터
+        """
         if data.email:
             user = await self.repository.get_user_by_email(session, data.email)
         else:
@@ -54,6 +74,14 @@ class UserService:
         return user
 
     async def register_user(self, data: register.RegisterDto, session: Session):
+        """
+        Parameters:
+            data: register.RegisterDto
+            session: Session
+
+        Returns:
+            tuple: access, refresh 토큰
+        """
         user = await self._is_register_valid(data, session)
 
         data = data.model_dump(by_alias=True)
@@ -64,6 +92,14 @@ class UserService:
         return access, refresh
 
     async def login_user(self, data: login.LoginDto, session: Session):
+        """
+        Parameters:
+            data: login.LoginDto
+            session: Session
+
+        Returns:
+            tuple: access, refresh 토큰
+        """
         user = await self._is_login_valid(data, session)
 
         access, refresh = await self._issue_tokens(user)

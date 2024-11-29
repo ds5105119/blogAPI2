@@ -1,7 +1,5 @@
-from pydantic import BaseModel, EmailStr, Field, field_serializer, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing_extensions import Self
-
-from .register import ph
 
 
 class LoginDto(BaseModel):
