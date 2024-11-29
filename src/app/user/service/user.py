@@ -1,11 +1,11 @@
 import argon2
 from fastapi import HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession as Session
 from webtool.auth import JWTService
 
 from src.app.user.repository.user import UserRepository, user_repository
 from src.app.user.schema import login, register
 from src.core.dependencies.auth import jwt_service as default_jwt_service
+from src.core.dependencies.db import db_session
 
 
 class UserService:
@@ -30,7 +30,7 @@ class UserService:
         payload = self._user_to_claim(db_user)
         return await self.jwt_service.create_token(payload)
 
-    async def _is_register_valid(self, data: register.RegisterDto, session: Session):
+    async def _is_register_valid(self, data: register.RegisterDto, session: db_session):
         """
         Parameters:
             data: register.RegisterDto
@@ -48,7 +48,7 @@ class UserService:
 
         return user
 
-    async def _is_login_valid(self, data: login.LoginDto, session: Session):
+    async def _is_login_valid(self, data: login.LoginDto, session: db_session):
         """
         Parameters:
             data: login.LoginDto
@@ -73,7 +73,7 @@ class UserService:
 
         return user
 
-    async def register_user(self, data: register.RegisterDto, session: Session):
+    async def register_user(self, data: register.RegisterDto, session: db_session):
         """
         Parameters:
             data: register.RegisterDto
@@ -91,7 +91,7 @@ class UserService:
         access, refresh = await self._issue_tokens(user)
         return access, refresh
 
-    async def login_user(self, data: login.LoginDto, session: Session):
+    async def login_user(self, data: login.LoginDto, session: db_session):
         """
         Parameters:
             data: login.LoginDto

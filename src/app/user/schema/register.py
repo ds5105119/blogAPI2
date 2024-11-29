@@ -37,4 +37,4 @@ class RegisterDto(HandleDto, EmailDto):
 
 class RegisterResponse(BaseModel):
     access: str
-    refresh: str | None
+    refresh: str | None = None

@@ -16,4 +16,4 @@ class LoginDto(BaseModel):
 
 class LoginResponse(BaseModel):
     access: str
-    refresh: str | None
+    refresh: str | None = None

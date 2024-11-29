@@ -32,6 +32,10 @@ class AWS(BaseModel):
     s3_region_name: str
 
 
+class ApiAdapter(BaseModel):
+    key: str
+
+
 class Settings(BaseSettings):
     base_dir: Path = Path(__file__).resolve().parent.parent.parent
 
@@ -52,6 +56,8 @@ class Settings(BaseSettings):
 
     aws: AWS
     oauth_google: OAuthConfig
+
+    open_fiscal_data_api: ApiAdapter
 
     @property
     def postgres_dsn(self) -> PostgresDsn:

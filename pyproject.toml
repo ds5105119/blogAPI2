@@ -16,6 +16,7 @@ psycopg = {extras = ["binary"], version = "^3.2.3"}
 coverage = "^7.6.4"
 webtool = "^0.0.11"
 sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
+pandas = "^2.2.3"
 
 
 [tool.poetry.group.dev.dependencies]
