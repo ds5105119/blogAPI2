@@ -1,4 +1,3 @@
-import argon2
 from sqlalchemy import Column, ForeignKey, Integer, String, create_engine, insert, select
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -45,10 +44,6 @@ with engine.connect() as conn:
 
 
 with engine.connect() as conn:
-    ph = argon2.PasswordHasher()
     stmt = select(User.fullname).where(User.name == "spongebobx")
     result = conn.execute(stmt)
-
-    print(ph.verify(ph.hash("sex"), "sex"))
-
-    print(result.first().fullname)
+    print(result.all())

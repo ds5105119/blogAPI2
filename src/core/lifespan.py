@@ -2,16 +2,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.core.dependencies.db import Postgres, Redis
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # app start
-    try:
-        pass
-    except Exception as e:
-        raise e
-    finally:
-        yield
+
+    yield
 
     # app shutdown
+    await Postgres.aclose()
+    await Redis.aclose()
     print("Application Stopped")
