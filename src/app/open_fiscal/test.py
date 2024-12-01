@@ -18,7 +18,7 @@ class FiscalDataLoader:
     with support for parallel data retrieval and comprehensive error handling.
     """
 
-    def __init__(self, base_url: str, path: str, max_workers: int = 10):
+    def __init__(self, base_url: str, path: str):
         """
         Initialize the FiscalDataLoader with configurable parameters.
 
@@ -91,7 +91,7 @@ class FiscalDataLoader:
             pd.DataFrame: DataFrame containing fiscal data for a page
         """
         try:
-            response = await client.get(f"{self.base_url}{self.path}", params=params, timeout=10.0)
+            response = await client.get(f"{self.base_url}{self.path}", params=params)
             data = json.loads(response.json())[self.path][1]["row"]
             return pd.DataFrame(data)
         except (KeyError, IndexError):
@@ -197,7 +197,7 @@ class FiscalDataManager:
         return results
 
     async def _get_from_url(self, years: Iterable[int]):
-        client = httpx.AsyncClient()
+        client = httpx.AsyncClient(timeout=20.0)
         data_availability = await self.loader.scan_data_availability(
             client,
             start_year=min(years),
