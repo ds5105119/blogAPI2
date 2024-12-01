@@ -159,11 +159,11 @@ class FiscalDataLoader:
 
         consolidated_df = pd.concat(dataframes, ignore_index=True)
         consolidated_df = consolidated_df.sort_values(
-            by=(
+            by=[
                 "OFFC_NM",
                 "Y_YY_MEDI_KCUR_AMT",
                 "Y_YY_DFN_MEDI_KCUR_AMT",
-            ),
+            ],
             ignore_index=True,
         )
 
