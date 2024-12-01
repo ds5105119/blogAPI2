@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Annotated, List
+from typing import Annotated
 
 from pydantic import BaseModel, Field, PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     base_url: Annotated[str, Field(default="http://localhost:8000")]
     secret_key: Annotated[str, Field(default="YtGHVqSAzFyaHk2OV5XQg3")]
 
-    cors_allow_origin: List[str] = Field(default_factory=list, frozen=True)
-    allowed_hosts: List[str] = Field(default_factory=list, frozen=True)
+    cors_allow_origin: list[str] = Field(default_factory=list, frozen=True)
+    allowed_hosts: list[str] = Field(default_factory=list, frozen=True)
 
     project_name: Annotated[str, Field(default="API")]
     api_url: Annotated[str, Field(default="/api")]
