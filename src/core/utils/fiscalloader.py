@@ -2,10 +2,10 @@ import asyncio
 import json
 from datetime import datetime
 from typing import Iterable
+from urllib.parse import urljoin
 
 import httpx
 import pandas as pd
-import requests
 
 from src.core.config import settings
 
@@ -18,7 +18,7 @@ class FiscalDataLoader:
     with support for parallel data retrieval and comprehensive error handling.
     """
 
-    def __init__(self, base_url: str, path: str):
+    def __init__(self, base_url: str, path: str, save_key_prefix: str | None = None, timeout: int = 30):
         """
         Initialize the FiscalDataLoader with configurable parameters.
 
@@ -28,6 +28,9 @@ class FiscalDataLoader:
         """
         self.base_url = base_url
         self.path = path
+        self.url = urljoin(self.base_url, self.path)
+        self._save_key_prefix = save_key_prefix or path
+        self._timeout = timeout
 
     @staticmethod
     def _create_request_params(year: str | int, index: str | int = "1", size: str | int = "1") -> dict[str, str]:
@@ -50,14 +53,6 @@ class FiscalDataLoader:
             "FSCL_YY": str(year),
         }
 
-    @staticmethod
-    def _get_url_data(url: str, path: str, params: dict) -> dict:
-        result = requests.get(url + path, params=params)
-        result = result.json()
-        result = json.loads(result)
-        result = result[path][1]["row"]
-        return result
-
     async def _fetch_total_record_count(self, params: dict[str, str], client: httpx.AsyncClient) -> int:
         """
         Retrieve the total number of records for a given year.
@@ -73,10 +68,10 @@ class FiscalDataLoader:
             ValueError: If data cannot be retrieved
         """
         try:
-            response = await client.get(f"{self.base_url}{self.path}", params=params)
+            response = await client.get(self.url, params=params, follow_redirects=True)
             data = json.loads(response.json())
             return data[self.path][0]["head"][0]["list_total_count"]
-        except (KeyError, IndexError) as e:
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
             raise ValueError(f"Unable to retrieve data: {e}")
 
     async def _fetch_page_data(self, params: dict[str, str], client: httpx.AsyncClient) -> pd.DataFrame:
@@ -90,12 +85,20 @@ class FiscalDataLoader:
         Returns:
             pd.DataFrame: DataFrame containing fiscal data for a page
         """
+
+        async def fetch():
+            try:
+                response = await client.get(self.url, params=params, follow_redirects=True)
+                data = json.loads(response.json())[self.path][1]["row"]
+                return pd.DataFrame(data)
+            except (KeyError, IndexError):
+                return pd.DataFrame()
+
         try:
-            response = await client.get(f"{self.base_url}{self.path}", params=params)
-            data = json.loads(response.json())[self.path][1]["row"]
-            return pd.DataFrame(data)
-        except (KeyError, IndexError):
-            return pd.DataFrame()
+            return await fetch()
+        except (json.JSONDecodeError, httpx.ReadTimeout):
+            await asyncio.sleep(1)
+            return await fetch()
 
     async def scan_data_availability(
         self,
@@ -140,7 +143,7 @@ class FiscalDataLoader:
 
         Args:
             client (httpx.AsyncClient): Client for HTTP requests
-            year (str or int): Fiscal year to retrieve data for
+            year (str or int): Fiscal year to retrieve data
             page_size (int): Number of records to fetch per page
             total_records (int): Number of total records
 
@@ -158,54 +161,45 @@ class FiscalDataLoader:
         dataframes = await asyncio.gather(*tasks)
 
         consolidated_df = pd.concat(dataframes, ignore_index=True)
-        consolidated_df = consolidated_df.sort_values(
-            by=[
-                "OFFC_NM",
-                "Y_YY_MEDI_KCUR_AMT",
-                "Y_YY_DFN_MEDI_KCUR_AMT",
-            ],
-            ignore_index=True,
-        )
-
         return consolidated_df
 
-    def get_from_cache(self, key: str) -> pd.DataFrame:
+    def get_from_cache(self, cache, key: str):
         pass
 
+    def _fetchall_from_cache(self, years: Iterable[int]):
+        """
+        Fetch existing data from the cache
 
-class FiscalDataManager:
-    def __init__(
-        self,
-        base_url: str = "https://openapi.openfiscaldata.go.kr/",
-        path: str = "ExpenditureBudgetInit5",
-        start_year: int | None = None,
-        end_year: int | None = None,
-        save_key_prefix: str | None = None,
-        loader: FiscalDataLoader | None = None,
-    ):
-        current_year = datetime.now().year
-        self.start_year = start_year or current_year - 30
-        self.end_year = end_year or current_year + 1
-        self.loader = loader or FiscalDataLoader(base_url, path)
-        self.save_key_prefix = save_key_prefix or path
-        self.data = self.sync_get_data(self.start_year, self.end_year)
+        Parameters:
+            years: years to retrieve data
 
-    def _get_from_cache(self, years: Iterable[int]):
-        results = {year: self.loader.get_from_cache(f"{self.save_key_prefix}{year}") for year in years}
+        Returns:
+            dict of years and data
+        """
+        results = {year: self.get_from_cache(None, f"{self._save_key_prefix}{year}") for year in years}
         results = {k: v for k, v in results.items() if v}
 
         return results
 
-    async def _get_from_url(self, years: Iterable[int]):
-        client = httpx.AsyncClient(timeout=20.0)
-        data_availability = await self.loader.scan_data_availability(
+    async def _fetchall_from_url(self, years: Iterable[int]):
+        """
+        Fetch existing data from the Financial Information Disclosure System
+
+        Parameters:
+            years: years to retrieve data
+
+        Returns:
+            dict of years and data
+        """
+        client = httpx.AsyncClient(timeout=self._timeout)
+        data_availability = await self.scan_data_availability(
             client,
             start_year=min(years),
             end_year=max(years),
         )
 
         tasks = (
-            self.loader.get_from_url(
+            self.get_from_url(
                 client,
                 year=year,
                 total_records=count,
@@ -217,14 +211,27 @@ class FiscalDataManager:
         await client.aclose()
         return {k: v for k, v in zip(data_availability.keys(), results) if not v.empty}
 
-    async def get_data(self, start_year: int, end_year: int) -> pd.DataFrame:
+    async def get_data(self, start_year: int | None = None, end_year: int | None = None) -> pd.DataFrame:
+        """
+        비동기적으로 열린재정 공개시스템의 데이터를 가져오는 함수
+
+        Parameters:
+            start_year (int): 집계를 시작할 연도, 기본갑 30년 전
+            end_year (int): 집계를 종료할 연도, 기본값 내년
+
+        Returns:
+            수집된 데이터를 self.data에 저장한 뒤, self.data 반환
+        """
+        current_year = datetime.now().year
+        start_year = start_year or current_year - 30
+        end_year = end_year or current_year + 1
         years = set(range(start_year, end_year + 1))
 
-        data = self._get_from_cache(years)
-        data.update(await self._get_from_url(years - set(data.keys())))
-        data = pd.concat(data.values(), keys=data.keys())
+        # fetch from cache
+        data = self._fetchall_from_cache(years)
 
-        return data
+        # fetch from server
+        data.update(await self._fetchall_from_url(years - set(data.keys())))
 
-    def sync_get_data(self, start_year: int, end_year: int) -> pd.DataFrame:
-        return asyncio.run(self.get_data(start_year, end_year))
+        df = pd.concat(data.values())
+        return df
