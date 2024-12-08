@@ -2,9 +2,8 @@ import argon2
 from fastapi import HTTPException, status
 from webtool.auth import JWTService
 
-from src.app.user.repository.user import UserRepository, user_repository
+from src.app.user.repository.user import UserRepository
 from src.app.user.schema import login, register
-from src.core.dependencies.auth import jwt_service as default_jwt_service
 from src.core.dependencies.db import db_session
 
 
@@ -104,6 +103,3 @@ class UserService:
 
         access, refresh = await self._issue_tokens(user)
         return access, refresh
-
-
-user_service = UserService(user_repository, default_jwt_service)

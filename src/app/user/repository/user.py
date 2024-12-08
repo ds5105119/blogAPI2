@@ -1,7 +1,6 @@
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession as Session
 
-from src.app.user.model.user import User
 from src.core.models.repository import (
     BaseCreateRepository,
     BaseDeleteRepository,
@@ -47,6 +46,3 @@ class UserDeleteRepository(BaseDeleteRepository[User]):
 
 class UserRepository(UserCreateRepository, UserReadRepository, UserUpdateRepository, UserDeleteRepository):
     pass
-
-
-user_repository = UserRepository(User)

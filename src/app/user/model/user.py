@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKeyConstraint, Index, Integer, PrimaryKeyConstraint, String, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKeyConstraint, Integer, PrimaryKeyConstraint, String, func
 from sqlalchemy.ext.mutable import MutableSet
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

@@ -2,10 +2,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
 
-from src.app.user.api.dependencies import ExtendOAuth2PasswordBearer
+from src.app.user.api.dependencies import ExtendOAuth2PasswordBearer, user_service
 from src.app.user.schema.login import LoginResponse
 from src.app.user.schema.register import RegisterResponse
-from src.app.user.service.user import user_service
 
 router = APIRouter()
 oauth_password_schema = ExtendOAuth2PasswordBearer(tokenUrl="login")

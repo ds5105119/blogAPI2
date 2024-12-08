@@ -3,6 +3,14 @@ from typing import Optional
 from fastapi import Request
 from fastapi.security import OAuth2AuthorizationCodeBearer, OAuth2PasswordBearer
 
+from src.app.user.model.user import User
+from src.app.user.repository.user import UserRepository
+from src.app.user.service.user import UserService
+from src.core.dependencies.auth import jwt_service
+
+user_repository = UserRepository(User)
+user_service = UserService(user_repository, jwt_service)
+
 
 class ExtendOAuth2PasswordBearer(OAuth2PasswordBearer):
     """
