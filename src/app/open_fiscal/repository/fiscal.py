@@ -23,22 +23,10 @@ class FiscalRepository:
             (year_column >= start_year if start_year else True) & (year_column <= end_year if end_year else True)
         )
 
-    @staticmethod
-    def _pagination(dataset: pl.LazyFrame, page: int, size: int) -> pl.LazyFrame:
-        return dataset.slice(page * size, (page + 1) * size)
-
-    def get_by_year(self, start_year: int | str | None, end_year: int | str | None) -> dict:
+    def get_by_year(self, start_year: int | str | None, end_year: int | str | None) -> pl.LazyFrame:
         start_year, end_year = self._duration_to_str(start_year, end_year)
-        return (
-            self._filter_by_year(self.fiscal_data_manager.by__year, start_year, end_year)
-            .collect()
-            .to_dict(as_series=False)
-        )
+        return self._filter_by_year(self.fiscal_data_manager.by__year, start_year, end_year)
 
-    def get_by_year__offc_nm(self, start_year: int | str | None, end_year: int | str | None) -> dict:
+    def get_by_year__offc_nm(self, start_year: int | str | None, end_year: int | str | None) -> pl.LazyFrame:
         start_year, end_year = self._duration_to_str(start_year, end_year)
-        return (
-            self._filter_by_year(self.fiscal_data_manager.by__year__offc_nm, start_year, end_year)
-            .collect()
-            .to_dict(as_series=False)
-        )
+        return self._filter_by_year(self.fiscal_data_manager.by__year__offc_nm, start_year, end_year)

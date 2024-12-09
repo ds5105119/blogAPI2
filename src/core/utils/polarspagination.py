@@ -1,8 +1,7 @@
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 import polars as pl
 from fastapi import Query
-from fastapi_pagination import Params
 from fastapi_pagination.bases import AbstractPage, AbstractParams, RawParams
 from pydantic import BaseModel
 from typing_extensions import Self
@@ -18,6 +17,7 @@ class LazyFrameParams(BaseModel, AbstractParams):
         return RawParams(
             limit=self.size if self.size is not None else None,
             offset=self.size * (self.page - 1) if self.page is not None and self.size is not None else None,
+            include_total=False,
         )
 
 
@@ -25,25 +25,22 @@ class LazyFramePage(AbstractPage[T], Generic[T]):
     results: list[T]
     totalResults: int
 
-    __params_type__ = Params
+    __params_type__ = LazyFrameParams
 
     @staticmethod
     def get_lazf_length(dataset: pl.LazyFrame):
         return dataset.select(pl.len()).collect().item()
 
     @staticmethod
-    def _pagination(dataset: pl.LazyFrame, page: int, size: int) -> pl.LazyFrame:
-        return dataset.slice((page - 1) * size, size)
+    def paginated_lazf(dataset: pl.LazyFrame, params: RawParams) -> list:
+        return dataset.slice(params.offset, params.limit).collect().to_dicts()
 
     @classmethod
     def create(cls, items: T, params: LazyFrameParams, *args, **kwargs: Any) -> Self:
         total = cls.get_lazf_length(items)
+        items = cls.paginated_lazf(items, params.to_raw_params())
 
         return cls(
             results=items,
             totalResults=total,
         )
-
-
-page = LazyFramePage[int].create(range(100), Params())
-print(page.model_dump_json(indent=4))
