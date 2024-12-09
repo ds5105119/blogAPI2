@@ -5,7 +5,8 @@ from typing import Iterable
 from urllib.parse import urljoin
 
 import httpx
-import pandas as pd
+import polars as pl
+from webtool.cache import RedisCache
 
 from src.core.config import settings
 
@@ -74,7 +75,7 @@ class FiscalDataLoader:
         except (KeyError, IndexError, json.JSONDecodeError) as e:
             raise ValueError(f"Unable to retrieve data: {e}")
 
-    async def _fetch_page_data(self, params: dict[str, str], client: httpx.AsyncClient) -> pd.DataFrame:
+    async def _fetch_page_data(self, params: dict[str, str], client: httpx.AsyncClient) -> pl.LazyFrame:
         """
         Fetch a single page of fiscal data.
 
@@ -90,9 +91,9 @@ class FiscalDataLoader:
             try:
                 response = await client.get(self.url, params=params, follow_redirects=True)
                 data = json.loads(response.json())[self.path][1]["row"]
-                return pd.DataFrame(data)
+                return pl.LazyFrame(data, infer_schema_length=int(params.get("pSize")))
             except (KeyError, IndexError):
-                return pd.DataFrame()
+                return pl.LazyFrame()
 
         try:
             return await fetch()
@@ -137,7 +138,7 @@ class FiscalDataLoader:
         year: str | int,
         page_size: int = 1000,
         total_records: int | None = None,
-    ) -> pd.DataFrame:
+    ) -> pl.LazyFrame:
         """
         Retrieve fiscal data for a specific year using parallel processing.
 
@@ -160,13 +161,13 @@ class FiscalDataLoader:
         tasks = (self._fetch_page_data(params, client) for params in page_params)
         dataframes = await asyncio.gather(*tasks)
 
-        consolidated_df = pd.concat(dataframes, ignore_index=True)
+        consolidated_df = pl.concat(dataframes)
         return consolidated_df
 
-    def get_from_cache(self, cache, key: str):
-        pass
+    async def get_from_cache(self, cache: RedisCache, key: str) -> pl.LazyFrame | None:
+        return None
 
-    def _fetchall_from_cache(self, years: Iterable[int]):
+    async def _fetchall_from_cache(self, years: Iterable[int]) -> dict[int, pl.LazyFrame]:
         """
         Fetch existing data from the cache
 
@@ -176,14 +177,15 @@ class FiscalDataLoader:
         Returns:
             dict of years and data
         """
-        results = {year: self.get_from_cache(None, f"{self._save_key_prefix}{year}") for year in years}
+        results = {year: await self.get_from_cache(None, f"{self._save_key_prefix}{year}") for year in years}
         results = {k: v for k, v in results.items() if v}
 
         return results
 
-    async def _fetchall_from_url(self, years: Iterable[int]):
+    async def _fetchall_from_url(self, years: Iterable[int]) -> dict[int, pl.LazyFrame]:
         """
         Fetch existing data from the Financial Information Disclosure System
+        Polars 에는 현재 LazyFrame 의 EMPTY 함수가 없음. 따라서 dictionary comprehension 에서 독특한 코드로 체크 중
 
         Parameters:
             years: years to retrieve data
@@ -192,12 +194,12 @@ class FiscalDataLoader:
             dict of years and data
         """
         client = httpx.AsyncClient(timeout=self._timeout)
+
         data_availability = await self.scan_data_availability(
             client,
             start_year=min(years),
             end_year=max(years),
         )
-
         tasks = (
             self.get_from_url(
                 client,
@@ -207,11 +209,17 @@ class FiscalDataLoader:
             for year, count in data_availability.items()
         )
         results = await asyncio.gather(*tasks)
+        results = {k: v for k, v in zip(data_availability.keys(), results) if not v.limit(1).collect().is_empty()}
 
         await client.aclose()
-        return {k: v for k, v in zip(data_availability.keys(), results) if not v.empty}
+        return results
 
-    async def get_data(self, start_year: int | None = None, end_year: int | None = None) -> pd.DataFrame:
+    async def get_data(
+        self,
+        start_year: int | None = None,
+        end_year: int | None = None,
+        save: bool = True,
+    ) -> pl.LazyFrame:
         """
         비동기적으로 열린재정 공개시스템의 데이터를 가져오는 함수
 
@@ -227,11 +235,11 @@ class FiscalDataLoader:
         end_year = end_year or current_year + 1
         years = set(range(start_year, end_year + 1))
 
-        # fetch from cache
-        data = self._fetchall_from_cache(years)
+        # fetch from cache, server
+        cached_data = await self._fetchall_from_cache(years)
+        server_data = await self._fetchall_from_url(years - set(cached_data.keys()))
+        print("패치 완료")
 
-        # fetch from server
-        data.update(await self._fetchall_from_url(years - set(data.keys())))
-
-        df = pd.concat(data.values())
+        cached_data.update(server_data)
+        df = pl.concat(cached_data.values())
         return df

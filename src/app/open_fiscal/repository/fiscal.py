@@ -1,3 +1,5 @@
+import polars as pl
+
 from src.core.dependencies.fiscal import FiscalDataManager
 
 
@@ -14,26 +16,29 @@ class FiscalRepository:
 
         return start_year, end_year
 
-    def get_all_sum_by_year(self, start_year: int | str | None, end_year: int | str | None) -> dict:
+    @staticmethod
+    def _filter_by_year(dataset: pl.LazyFrame, start_year: str | None, end_year: str | None) -> pl.LazyFrame:
+        year_column = pl.col(dataset.collect_schema().names()[0])
+        return dataset.filter(
+            (year_column >= start_year if start_year else True) & (year_column <= end_year if end_year else True)
+        )
+
+    @staticmethod
+    def _pagination(dataset: pl.LazyFrame, page: int, size: int) -> pl.LazyFrame:
+        return dataset.slice(page * size, (page + 1) * size)
+
+    def get_by_year(self, start_year: int | str | None, end_year: int | str | None) -> dict:
         start_year, end_year = self._duration_to_str(start_year, end_year)
+        return (
+            self._filter_by_year(self.fiscal_data_manager.by__year, start_year, end_year)
+            .collect()
+            .to_dict(as_series=False)
+        )
 
-        df = self.fiscal_data_manager.year__sum.loc[start_year:end_year].to_dict()
-        return df
-
-    def get_all_pct_by_year(self, start_year: int | str | None, end_year: int | str | None) -> dict:
+    def get_by_year__offc_nm(self, start_year: int | str | None, end_year: int | str | None) -> dict:
         start_year, end_year = self._duration_to_str(start_year, end_year)
-
-        df = self.fiscal_data_manager.year__pct.loc[start_year:end_year].to_dict()
-        return df
-
-    def get_offc_nm_sum_by_year(self, start_year: int | str | None, end_year: int | str | None) -> dict:
-        start_year, end_year = self._duration_to_str(start_year, end_year)
-
-        df = self.fiscal_data_manager.year__offc_nm__sum.loc[start_year:end_year].to_dict()
-        return df
-
-    def get_offc_nm_pct_by_year(self, start_year: int | str | None, end_year: int | str | None) -> dict:
-        start_year, end_year = self._duration_to_str(start_year, end_year)
-
-        df = self.fiscal_data_manager.year__offc_nm__pct.loc[start_year:end_year].to_dict()
-        return df
+        return (
+            self._filter_by_year(self.fiscal_data_manager.by__year__offc_nm, start_year, end_year)
+            .collect()
+            .to_dict(as_series=False)
+        )

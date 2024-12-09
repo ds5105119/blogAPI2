@@ -7,9 +7,7 @@ class FiscalService:
         self.repository = repository
 
     def get_fiscal(self, data: FiscalDto):
-        mode = data.mode
-
-        if mode == "sum":
-            return self.repository.get_all_sum_by_year(data.start_year, data.end_year)
-        elif mode == "pct":
-            return self.repository.get_all_pct_by_year(data.start_year, data.end_year)
+        if data.level == data.level.by_year:
+            return self.repository.get_by_year(data.start_year, data.end_year)
+        else:
+            return self.repository.get_by_year__offc_nm(data.start_year, data.end_year)

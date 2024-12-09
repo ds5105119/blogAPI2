@@ -1,3 +1,5 @@
+from typing import cast
+
 import argon2
 from fastapi import HTTPException, status
 from webtool.auth import JWTService
@@ -37,7 +39,7 @@ class UserService:
 
         Returns: 읽은 유저 데이터
         """
-        user = await self.repository.get_unique_fields(session, data.email, data.handle)
+        user = await self.repository.get_unique_fields(session, cast(str, data.email), data.handle)
 
         if user.all():
             raise HTTPException(
@@ -56,7 +58,7 @@ class UserService:
         Returns: 읽은 유저 데이터
         """
         if data.email:
-            user = await self.repository.get_user_by_email(session, data.email)
+            user = await self.repository.get_user_by_email(session, cast(str, data.email))
         else:
             user = await self.repository.get_user_by_handle(session, data.handle)
 

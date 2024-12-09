@@ -1,6 +1,7 @@
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession as Session
 
+from src.app.user.model.user import User
 from src.core.models.repository import (
     BaseCreateRepository,
     BaseDeleteRepository,

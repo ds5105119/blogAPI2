@@ -2,12 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
 
-from src.app.user.api.dependencies import ExtendOAuth2PasswordBearer, user_service
+from src.app.user.api.dependencies import user_service
 from src.app.user.schema.login import LoginResponse
 from src.app.user.schema.register import RegisterResponse
+from src.core.dependencies.oauth import oauth_password_schema
 
 router = APIRouter()
-oauth_password_schema = ExtendOAuth2PasswordBearer(tokenUrl="login")
 
 
 @router.post("/login", status_code=status.HTTP_200_OK)

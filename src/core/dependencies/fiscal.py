@@ -1,6 +1,6 @@
 from functools import cached_property
 
-import pandas as pd
+import polars as pl
 
 from src.core.utils.fiscalloader import FiscalDataLoader
 
@@ -14,7 +14,7 @@ class BaseFiscalDataManager:
         end_year: int | None = None,
         loader=FiscalDataLoader,
     ):
-        self.data: pd.DataFrame = pd.DataFrame()
+        self.data: pl.LazyFrame = pl.LazyFrame()
         self._start_year = start_year
         self._end_year = end_year
         self._loader = loader(base_url, path)
@@ -39,16 +39,22 @@ class FiscalDataManager(BaseFiscalDataManager):
     async def init(self):
         await super().init()
 
-        self.department_no = {k: v for v, k in enumerate(set(self.data["OFFC_NM"]))}
+        stmt = self.data.select("OFFC_NM")
+        self.department_no = {k: v for v, k in enumerate(set(stmt.collect().to_series()))}
 
         mappings = self._get_mappings()
         for mapping in mappings:
-            min_no = min([self.department_no[name] for name in mapping])
+            min_no = min([self.department_no[name] for name in mapping if self.department_no.get(name)])
             self.department_no.update({name: min_no for name in mapping})
 
-        self.data["NORMALIZED_DEPT_NO"] = self.data["OFFC_NM"].apply(lambda x: self.department_no[x])
+        self.data = self.data.with_columns(
+            pl.col("OFFC_NM")
+            .map_elements(lambda x: self.department_no.get(x, None), return_dtype=pl.Int8)
+            .alias("NORMALIZED_DEPT_NO")
+        )
 
-    def _get_mappings(self) -> list[list[str]]:
+    @staticmethod
+    def _get_mappings() -> list[list[str]]:
         return [
             ["문화재청", "국가유산청"],
             ["안전행정부", "행정자치부", "행정안전부"],
@@ -57,55 +63,21 @@ class FiscalDataManager(BaseFiscalDataManager):
         ]
 
     @cached_property
-    def year__sum(self):
-        return self.data.pivot_table(values=["Y_YY_MEDI_KCUR_AMT"], index=["FSCL_YY"], aggfunc="sum")
-
-    @cached_property
-    def year__pct(self):
-        return self.data.pivot_table(
-            values=["Y_YY_MEDI_KCUR_AMT"],
-            index=["FSCL_YY"],
-            aggfunc="sum",
-        ).pct_change()
-
-    @cached_property
-    def year__diff(self):
-        return self.data.pivot_table(
-            values=["Y_YY_MEDI_KCUR_AMT"],
-            index=["FSCL_YY"],
-            aggfunc="sum",
-        ).diff()
-
-    @cached_property
-    def year__offc_nm__sum(self):
-        return self.data.pivot_table(
-            values=["Y_YY_MEDI_KCUR_AMT"],
-            index=["FSCL_YY", "OFFC_NM"],
-            aggfunc="sum",
+    def by__year(self):
+        return (
+            self.data.group_by("FSCL_YY")
+            .agg(pl.col("Y_YY_MEDI_KCUR_AMT").sum().alias("TOTAL_AMT"))
+            .sort("FSCL_YY")
+            .with_columns(pl.col("TOTAL_AMT").pct_change().alias("PCT_CHANGE"))
         )
 
     @cached_property
-    def year__offc_nm__pct(self):
+    def by__year__offc_nm(self):
         return (
-            self.data.pivot_table(
-                values=["Y_YY_MEDI_KCUR_AMT"],
-                index=["FSCL_YY", "NORMALIZED_DEPT_NO", "OFFC_NM"],
-                aggfunc="sum",
-            )
-            .groupby(level=1)
-            .pct_change()
-        )
-
-    @cached_property
-    def year__offc_nm__diff(self):
-        return (
-            self.data.pivot_table(
-                values=["Y_YY_MEDI_KCUR_AMT"],
-                index=["FSCL_YY", "NORMALIZED_DEPT_NO", "OFFC_NM"],
-                aggfunc="sum",
-            )
-            .groupby(level=1)
-            .diff()
+            self.data.group_by(["FSCL_YY", "NORMALIZED_DEPT_NO", "OFFC_NM"])
+            .agg(pl.col("Y_YY_MEDI_KCUR_AMT").sum().alias("TOTAL_AMT"))
+            .sort(["NORMALIZED_DEPT_NO", "FSCL_YY"])
+            .with_columns(pl.col("TOTAL_AMT").pct_change().over("NORMALIZED_DEPT_NO").alias("PCT_CHANGE"))
         )
 
 
