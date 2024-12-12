@@ -1,8 +1,9 @@
-from functools import cached_property
-
 import polars as pl
+from webtool.cache import RedisCache
 
+from src.core.dependencies.db import Redis
 from src.core.utils.fiscalloader import FiscalDataLoader
+from src.core.utils.polarshelper import Table, group_by_frame_to_table
 
 
 class BaseFiscalDataManager:
@@ -12,15 +13,17 @@ class BaseFiscalDataManager:
         path: str,
         start_year: int | None = None,
         end_year: int | None = None,
+        cache: RedisCache | None = None,
         loader=FiscalDataLoader,
     ):
         self.data: pl.LazyFrame = pl.LazyFrame()
         self._start_year = start_year
         self._end_year = end_year
         self._loader = loader(base_url, path)
+        self._cache = cache
 
     async def init(self):
-        self.data = await self._loader.get_data(self._start_year, self._end_year)
+        self.data = await self._loader.get_data(self._start_year, self._end_year, self._cache)
 
 
 class FiscalDataManager(BaseFiscalDataManager):
@@ -30,11 +33,18 @@ class FiscalDataManager(BaseFiscalDataManager):
         path: str,
         start_year: int | None = None,
         end_year: int | None = None,
+        cache: RedisCache | None = None,
         loader=FiscalDataLoader,
     ):
-        super().__init__(base_url, path, start_year, end_year, loader)
+        super().__init__(base_url, path, start_year, end_year, cache, loader)
 
         self.department_no = {}
+        self.by__year = Table({})
+        self.by__year__offc_nm = Table({})
+
+    def build(self):
+        self.by__year = self._by__year()
+        self.by__year__offc_nm = self._by__year__offc_nm()
 
     async def init(self):
         await super().init()
@@ -53,6 +63,8 @@ class FiscalDataManager(BaseFiscalDataManager):
             .alias("NORMALIZED_DEPT_NO")
         )
 
+        self.build()
+
     @staticmethod
     def _get_mappings() -> list[list[str]]:
         return [
@@ -62,26 +74,27 @@ class FiscalDataManager(BaseFiscalDataManager):
             ["국가보훈처", "국가보훈부"],
         ]
 
-    @cached_property
-    def by__year(self):
-        return (
+    def _by__year(self):
+        lf = (
             self.data.group_by("FSCL_YY")
             .agg(pl.col("Y_YY_MEDI_KCUR_AMT").sum().alias("TOTAL_AMT"))
             .sort("FSCL_YY")
             .with_columns(pl.col("TOTAL_AMT").pct_change().alias("PCT_CHANGE"))
         )
+        return group_by_frame_to_table(lf, "FSCL_YY")
 
-    @cached_property
-    def by__year__offc_nm(self):
-        return (
+    def _by__year__offc_nm(self):
+        lf = (
             self.data.group_by(["FSCL_YY", "NORMALIZED_DEPT_NO", "OFFC_NM"])
             .agg(pl.col("Y_YY_MEDI_KCUR_AMT").sum().alias("TOTAL_AMT"))
             .sort(["NORMALIZED_DEPT_NO", "FSCL_YY"])
             .with_columns(pl.col("TOTAL_AMT").pct_change().over("NORMALIZED_DEPT_NO").alias("PCT_CHANGE"))
         )
+        return group_by_frame_to_table(lf, "FSCL_YY", "NORMALIZED_DEPT_NO")
 
 
 fiscal_data_manager = FiscalDataManager(
     base_url="https://openapi.openfiscaldata.go.kr",
     path="ExpenditureBudgetInit5",
+    cache=Redis,
 )

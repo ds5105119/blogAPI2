@@ -8,7 +8,7 @@ from webtool.throttle import LimitMiddleware
 
 from src.app.router import router
 from src.core.config import settings
-from src.core.dependencies.auth import jwt_backend
+from src.core.dependencies.auth import anno_backend, jwt_backend
 from src.core.dependencies.db import Redis
 from src.core.lifespan import lifespan
 
@@ -30,6 +30,7 @@ def create_application(debug=False) -> FastAPI:
             LimitMiddleware,  # type: ignore
             cache=Redis,
             auth_backend=jwt_backend,
+            anno_backend=anno_backend,
         ),
     ]
 
@@ -56,4 +57,4 @@ add_pagination(app)
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, workers=4)

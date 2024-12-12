@@ -1,4 +1,4 @@
-from webtool.auth import JWTBackend, RedisJWTService
+from webtool.auth import AnnoSessionBackend, JWTBackend, RedisJWTService
 
 from .db import Redis, settings
 
@@ -9,4 +9,5 @@ jwt_service = RedisJWTService(
     refresh_token_expire_time=settings.jwt.refresh_token_expire_time,
 )
 
+anno_backend = AnnoSessionBackend(session_name="th-session", secure=False)
 jwt_backend = JWTBackend(jwt_service)

@@ -1,4 +1,4 @@
-import polars as pl
+from datetime import datetime
 
 from src.core.dependencies.fiscal import FiscalDataManager
 
@@ -8,25 +8,36 @@ class FiscalRepository:
         self.fiscal_data_manager = fiscal_data_manager
 
     @staticmethod
-    def _duration_to_str(start_year: int | str | None, end_year: int | str | None) -> tuple[str | None, str | None]:
-        if isinstance(start_year, int):
-            start_year = str(start_year)
-        if isinstance(end_year, int):
-            end_year = str(end_year)
+    def _duration_to_range(start_year: int | str | None, end_year: int | str | None) -> list[str]:
+        if isinstance(start_year, str):
+            start_year = int(start_year)
+        if isinstance(end_year, str):
+            end_year = int(end_year)
 
-        return start_year, end_year
+        if start_year is None:
+            start_year = 2000
 
-    @staticmethod
-    def _filter_by_year(dataset: pl.LazyFrame, start_year: str | None, end_year: str | None) -> pl.LazyFrame:
-        year_column = pl.col(dataset.collect_schema().names()[0])
-        return dataset.filter(
-            (year_column >= start_year if start_year else True) & (year_column <= end_year if end_year else True)
-        )
+        if end_year is None:
+            end_year = datetime.now().year + 1
 
-    def get_by_year(self, start_year: int | str | None, end_year: int | str | None) -> pl.LazyFrame:
-        start_year, end_year = self._duration_to_str(start_year, end_year)
-        return self._filter_by_year(self.fiscal_data_manager.by__year, start_year, end_year)
+        return [str(year) for year in range(start_year, end_year)]
 
-    def get_by_year__offc_nm(self, start_year: int | str | None, end_year: int | str | None) -> pl.LazyFrame:
-        start_year, end_year = self._duration_to_str(start_year, end_year)
-        return self._filter_by_year(self.fiscal_data_manager.by__year__offc_nm, start_year, end_year)
+    def get_by_year(
+        self,
+        start_year: int | str | None,
+        end_year: int | str | None,
+        page: int | None = None,
+        size: int | None = None,
+    ):
+        years = self._duration_to_range(start_year, end_year)
+        return self.fiscal_data_manager.by__year.index([years], page, size).to_dicts()
+
+    def get_by_year__offc_nm(
+        self,
+        start_year: int | str | None,
+        end_year: int | str | None,
+        page: int | None = None,
+        size: int | None = None,
+    ):
+        years = self._duration_to_range(start_year, end_year)
+        return self.fiscal_data_manager.by__year__offc_nm.index([years], page, size).to_dicts()

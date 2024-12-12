@@ -164,10 +164,25 @@ class FiscalDataLoader:
         consolidated_df = pl.concat(dataframes)
         return consolidated_df
 
-    async def get_from_cache(self, cache: RedisCache, key: str) -> pl.LazyFrame | None:
+    def get_cache_key(self, year) -> str:
+        return f"{self._save_key_prefix}{year}"
+
+    @staticmethod
+    async def get_cache(cache: RedisCache, key: str) -> pl.LazyFrame | None:
+        serialized_data = await cache.get(key)
+
+        if serialized_data:
+            deserialized_data = json.loads(serialized_data)
+            return pl.LazyFrame(deserialized_data, infer_schema_length=100000)
+
         return None
 
-    async def _fetchall_from_cache(self, years: Iterable[int]) -> dict[int, pl.LazyFrame]:
+    @staticmethod
+    async def set_cache(cache: RedisCache, key: str, value: pl.LazyFrame | None) -> None:
+        serialized_data = json.dumps(value.collect().to_dicts())
+        await cache.set(key, serialized_data, ex=60 * 60 * 24 * 365)
+
+    async def _fetchall_from_cache(self, cache: RedisCache, years: Iterable[int]) -> dict[int, pl.LazyFrame]:
         """
         Fetch existing data from the cache
 
@@ -177,8 +192,8 @@ class FiscalDataLoader:
         Returns:
             dict of years and data
         """
-        results = {year: await self.get_from_cache(None, f"{self._save_key_prefix}{year}") for year in years}
-        results = {k: v for k, v in results.items() if v}
+        results = {year: await self.get_cache(cache, self.get_cache_key(year)) for year in years}
+        results = {k: v for k, v in results.items() if v is not None}
 
         return results
 
@@ -218,7 +233,8 @@ class FiscalDataLoader:
         self,
         start_year: int | None = None,
         end_year: int | None = None,
-        save: bool = True,
+        cache: RedisCache | None = None,
+        override: bool = False,
     ) -> pl.LazyFrame:
         """
         비동기적으로 열린재정 공개시스템의 데이터를 가져오는 함수
@@ -226,6 +242,8 @@ class FiscalDataLoader:
         Parameters:
             start_year (int): 집계를 시작할 연도, 기본갑 30년 전
             end_year (int): 집계를 종료할 연도, 기본값 내년
+            cache (RedisCache): webtool.RedisCache
+            override (bool): True 인 경우 강제로 리로딩 후 cache 에 값을 덮어씌움
 
         Returns:
             수집된 데이터를 self.data에 저장한 뒤, self.data 반환
@@ -235,11 +253,17 @@ class FiscalDataLoader:
         end_year = end_year or current_year + 1
         years = set(range(start_year, end_year + 1))
 
-        # fetch from cache, server
-        cached_data = await self._fetchall_from_cache(years)
-        server_data = await self._fetchall_from_url(years - set(cached_data.keys()))
-        print("패치 완료")
+        if cache is not None:
+            cached_data = {} if override else await self._fetchall_from_cache(cache, years)
+            server_data = await self._fetchall_from_url(years - set(cached_data.keys()))
 
-        cached_data.update(server_data)
-        df = pl.concat(cached_data.values())
+            tasks = (self.set_cache(cache, self.get_cache_key(k), v) for k, v in server_data.items())
+            await asyncio.gather(*tasks)
+
+            cached_data.update(server_data)
+            df = pl.concat(cached_data.values())
+        else:
+            data = await self._fetchall_from_url(years)
+            df = pl.concat(data.values())
+
         return df

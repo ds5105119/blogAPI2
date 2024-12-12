@@ -7,18 +7,26 @@ from src.app.user.schema.login import LoginResponse
 from src.app.user.schema.register import RegisterResponse
 from src.core.dependencies.oauth import oauth_password_schema
 
+# oauth_password_schema는 차후 유저 인증용
+
 router = APIRouter()
 
 
 @router.post("/login", status_code=status.HTTP_200_OK)
-async def login(tokens: Annotated[tuple[str, str], Depends(user_service.login_user)], response: Response):
+async def login(
+    tokens: Annotated[tuple[str, str], Depends(user_service.login_user)],
+    response: Response,
+) -> LoginResponse:
     access, refresh = tokens
     response.set_cookie(key="refresh", value=refresh, httponly=True)
     return LoginResponse(access=access)
 
 
 @router.post("/register", status_code=status.HTTP_200_OK)
-async def register(tokens: Annotated[tuple[str, str], Depends(user_service.register_user)], response: Response):
+async def register(
+    tokens: Annotated[tuple[str, str], Depends(user_service.register_user)],
+    response: Response,
+) -> RegisterResponse:
     access, refresh = tokens
     response.set_cookie(key="refresh", value=refresh, httponly=True)
     return RegisterResponse(access=access)
