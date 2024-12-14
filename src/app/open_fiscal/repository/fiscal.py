@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from src.core.dependencies.fiscal import FiscalDataManager
+from src.app.open_fiscal.model.fiscal import FiscalDataManager
 
 
 class FiscalRepository:
