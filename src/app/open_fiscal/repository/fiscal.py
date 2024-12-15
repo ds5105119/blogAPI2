@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from src.app.open_fiscal.model.fiscal import FiscalDataManager
+from src.app.open_fiscal.model.fiscal import FiscalData
 
 
 class FiscalRepository:
-    def __init__(self, fiscal_data_manager: FiscalDataManager):
+    def __init__(self, fiscal_data_manager: FiscalData):
         self.fiscal_data_manager = fiscal_data_manager
 
     @staticmethod

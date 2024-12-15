@@ -1,56 +1,30 @@
 import polars as pl
-from webtool.cache import RedisCache
 
-from src.core.dependencies.db import Redis
-from src.core.utils.fiscalloader import FiscalDataLoader
+from src.core.utils.openapi.datamanager import PolarsDataManager
 from src.core.utils.polarshelper import Table, group_by_frame_to_table
 
 
-class BaseFiscalDataManager:
-    def __init__(
-        self,
-        base_url: str,
-        path: str,
-        start_year: int | None = None,
-        end_year: int | None = None,
-        cache: RedisCache | None = None,
-        loader=FiscalDataLoader,
-    ):
-        self.data: pl.LazyFrame = pl.LazyFrame()
-        self._start_year = start_year
-        self._end_year = end_year
-        self._loader = loader(base_url, path)
-        self._cache = cache
-
-    async def init(self):
-        self.data = await self._loader.get_data(self._start_year, self._end_year, self._cache)
+class BaseFiscalData:
+    def __init__(self, manager: PolarsDataManager):
+        self.data = manager.data
 
 
-class FiscalDataManager(BaseFiscalDataManager):
-    def __init__(
-        self,
-        base_url: str,
-        path: str,
-        start_year: int | None = None,
-        end_year: int | None = None,
-        cache: RedisCache | None = None,
-        loader=FiscalDataLoader,
-    ):
-        super().__init__(base_url, path, start_year, end_year, cache, loader)
-
+class FiscalData(BaseFiscalData):
+    def __init__(self, manager: PolarsDataManager):
+        super().__init__(manager)
         self.department_no = {}
         self.by__year = Table({})
         self.by__year__offc_nm = Table({})
+        self.manager = manager
+        self.manager.register_callback(self._callback)
+
+    def _callback(self):
+        print("Manager data updated. Rebuilding FiscalData...")
+        self.data = self.manager.data
+        self.build()
 
     def build(self):
-        self.by__year = self._by__year()
-        self.by__year__offc_nm = self._by__year__offc_nm()
-
-    async def init(self):
-        await super().init()
-
-        stmt = self.data.select("OFFC_NM")
-        self.department_no = {k: v for v, k in enumerate(set(stmt.collect().to_series()))}
+        self.department_no = {k: v for v, k in enumerate(set(self.data.select("OFFC_NM").to_series()))}
 
         mappings = self._get_mappings()
         for mapping in mappings:
@@ -63,7 +37,8 @@ class FiscalDataManager(BaseFiscalDataManager):
             .alias("NORMALIZED_DEPT_NO")
         )
 
-        self.build()
+        self.by__year = self._by__year()
+        self.by__year__offc_nm = self._by__year__offc_nm()
 
     @staticmethod
     def _get_mappings() -> list[list[str]]:
@@ -91,10 +66,3 @@ class FiscalDataManager(BaseFiscalDataManager):
             .with_columns(pl.col("TOTAL_AMT").pct_change().over("NORMALIZED_DEPT_NO").alias("PCT_CHANGE"))
         )
         return group_by_frame_to_table(lf, "FSCL_YY", "NORMALIZED_DEPT_NO")
-
-
-fiscal_data_manager = FiscalDataManager(
-    base_url="https://openapi.openfiscaldata.go.kr",
-    path="ExpenditureBudgetInit5",
-    cache=Redis,
-)

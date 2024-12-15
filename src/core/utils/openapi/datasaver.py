@@ -6,15 +6,36 @@ from webtool.cache import RedisCache
 
 
 class BaseDataSaver(ABC):
+    """
+    REST API 의 데이터를 저장하고 불러오는 클래스
+
+    Attributes:
+        key_prefix (str): 키 전치사
+        expire (int): 만료 (초)
+    """
+
     key_prefix: str
     expire: int
 
     @abstractmethod
     async def get_cache(self, key: str) -> dict | None:
+        """
+        캐시로부터 데이터를 불러옵니다.
+
+        Parameters:
+            key (str): Cache Key
+        """
         pass
 
     @abstractmethod
     async def set_cache(self, key: str, value: dict) -> None:
+        """
+        캐시에 대이터를 저장합니다.
+
+        Parameters:
+            key (str): Cache Key
+            value (dict): Cache Value
+        """
         pass
 
 

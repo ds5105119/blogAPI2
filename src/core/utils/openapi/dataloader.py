@@ -38,12 +38,29 @@ class ApiConfig:
 
 
 class BaseOpenDataLoader(ABC):
+    """
+    REST API 에서 데이터를 불러오는 클래스
+
+    Attributes:
+        base_url (str): Base URL
+        swagger_url (str): Swagger URL
+        api_key (str): API key
+    """
+
     base_url: str
     swagger_url: str
     api_key: str | None
 
     @abstractmethod
     async def get_data(self, path: str, params: dict | None = None) -> dict | list[dict]:
+        """
+        Parameters:
+            path: API Endpoint
+            params: API Query Params
+
+        Returns:
+            API 의 응답
+        """
         pass
 
 
@@ -60,7 +77,7 @@ class OpenDataLoader(BaseOpenDataLoader):
         api_config: ApiConfig | None = None,
     ):
         """
-        Initialize the FiscalDataLoader with configurable parameters.
+        Initialize the OpenDataLoader with configurable parameters.
 
         Args:
             base_url (str):
@@ -126,11 +143,11 @@ class OpenDataLoader(BaseOpenDataLoader):
 
         _path: dict | None = self.paths.get(path, None)
         if _path is None:
-            raise ValueError("해당 경로를 찾을 수 없습니다.")
+            raise ValueError("The specified path could not be found.")
 
         _method = tuple(_path.keys())
         if not _method:
-            raise ValueError("요청을 보낼 수 없는 경로입니다.")
+            raise ValueError("The specified path cannot process requests.")
         _method = _method[0]
 
         _parameters = _path[_method].get(self._api_config.api_parameters_name, {})
@@ -140,15 +157,15 @@ class OpenDataLoader(BaseOpenDataLoader):
             if v.get(self._api_config.api_parameters_required, False)
         }
         if not _parameters_required.issubset(set(params.keys())):
-            raise ValueError("필수 파라미터가 누락되었습니다.", _parameters_required)
+            raise ValueError("Required parameters are missing.", _parameters_required)
 
         try:
             response = await getattr(client, _method)(path, params=params)
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
-            raise ValueError(f"HTTP 에러 발생: {e.response.status_code}, {e.response.text}")
+            raise ValueError(f"HTTP error occurred: {e.response.status_code}, {e.response.text}")
         except httpx.RequestError as e:
-            raise ValueError(f"요청 에러 발생: {str(e)}")
+            raise ValueError(f"A request error occurred: {str(e)}")
 
         try:
             data = response.json()
@@ -170,6 +187,19 @@ class OpenDataLoader(BaseOpenDataLoader):
 
         return data
 
+    async def _page_fetcher(
+        self,
+        client: httpx.AsyncClient,
+        path: str,
+        page: int,
+        params: dict | None = None,
+        semaphore: asyncio.Semaphore = None,
+    ):
+        async with semaphore if semaphore else asyncio.Semaphore(self._concurrency_limit):
+            params[self._api_config.request_page] = page
+            response = await self.fetch_data(client, path, params)
+            return response.get(self._api_config.response_data)
+
     async def fetch_paginated_data(
         self,
         client: httpx.AsyncClient,
@@ -184,14 +214,16 @@ class OpenDataLoader(BaseOpenDataLoader):
             return []
 
         params[self._api_config.request_size] = self._batch_size
-
-        async def fetch(page):
-            async with semaphore if semaphore else asyncio.Semaphore(self._concurrency_limit):
-                params[self._api_config.request_page] = page
-                response = await self.fetch_data(client, path, params)
-                return response.get(self._api_config.response_data)
-
-        tasks = [fetch(page) for page in range(1, ceil(total_count / self._batch_size) + 1)]
+        tasks = [
+            self._page_fetcher(
+                client,
+                path,
+                page,
+                params,
+                semaphore,
+            )
+            for page in range(1, ceil(total_count / self._batch_size) + 1)
+        ]
         data = list(chain.from_iterable(await asyncio.gather(*tasks)))
 
         return data
@@ -209,7 +241,7 @@ class OpenDataLoader(BaseOpenDataLoader):
             return data if data else await self.fetch_data(client, path, params)
 
 
-class YearlyDataLoader(OpenDataLoader):
+class FiscalDataLoader(OpenDataLoader):
     async def fetch_total_record_count(
         self,
         client: httpx.AsyncClient,
@@ -225,31 +257,18 @@ class YearlyDataLoader(OpenDataLoader):
         except (KeyError, IndexError, ValueError, TypeError):
             return 0
 
-    async def fetch_paginated_data(
+    async def _page_fetcher(
         self,
         client: httpx.AsyncClient,
         path: str,
+        page: int,
         params: dict | None = None,
         semaphore: asyncio.Semaphore = None,
-    ) -> list[dict]:
-        params = {} if params is None else params
-        total_count = await self.fetch_total_record_count(client, path, params)
-
-        if not total_count:
-            return []
-
-        params[self._api_config.request_size] = self._batch_size
-
-        async def fetch(page):
-            async with semaphore if semaphore else asyncio.Semaphore(self._concurrency_limit):
-                params[self._api_config.request_page] = page
-                response = await self.fetch_data(client, path, params)
-                return response[path][1]["row"]
-
-        tasks = [fetch(page) for page in range(1, ceil(total_count / self._batch_size) + 1)]
-        data = list(chain.from_iterable(await asyncio.gather(*tasks)))
-
-        return data
+    ):
+        async with semaphore if semaphore else asyncio.Semaphore(self._concurrency_limit):
+            params[self._api_config.request_page] = page
+            response = await self.fetch_data(client, path, params)
+            return response[path][1]["row"]
 
     async def get_data(self, path: str, params: dict | None = None) -> dict | list[dict]:
         if self.swagger_url:
@@ -258,14 +277,15 @@ class YearlyDataLoader(OpenDataLoader):
 
         params = {} if params is None else params
         semaphore = asyncio.Semaphore(self._concurrency_limit)
+        client = self.get_client()
 
-        async with self.get_client() as client:
+        async def fetch(year):
+            _params = params.copy()
+            _params[self._api_config.request_year] = year
+            return await self.fetch_paginated_data(client, path, _params, semaphore)
 
-            async def fetch(year):
-                params[self._api_config.request_year] = year
-                return await self.fetch_paginated_data(client, path, params, semaphore)
+        tasks = [fetch(str(year)) for year in range(datetime.now().year - 30, datetime.now().year + 2)]
+        data = list(chain.from_iterable(await asyncio.gather(*tasks)))
 
-            tasks = [fetch(year) for year in range(datetime.now().year - 30, datetime.now().year + 2)]
-            data = list(chain.from_iterable(await asyncio.gather(*tasks)))
-
+        await client.aclose()
         return data

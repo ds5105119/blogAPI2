@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     oauth_google: OAuthConfig
 
     open_fiscal_data_api: ApiAdapter
+    gov_24_data_api: ApiAdapter
 
     @property
     def postgres_dsn(self) -> PostgresDsn:

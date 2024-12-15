@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
-from fastapi_pagination import add_pagination
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
@@ -51,10 +50,9 @@ def create_application(debug=False) -> FastAPI:
 
 
 app = create_application(debug=settings.debug)
-add_pagination(app)
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, workers=4)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, workers=1)
