@@ -16,7 +16,6 @@ pydantic-settings = "^2.5.2"
 ruff = "*"
 webtool = "^0.0.11"
 polars = "^1.17.0"
-fastapi-pagination = "^0.12.32"
 
 
 [tool.poetry.group.dev.dependencies]
