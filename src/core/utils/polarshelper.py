@@ -38,18 +38,22 @@ class Table:
             table = Table(table)
 
         elif page is not None and size is not None:
-            keys = sorted(tuple(set(product(*stmt, *self.keys[len(stmt) :])).intersection(self._raw_keys)))
-            table = {k: self.table.get(k) for k in keys[(page - 1) * size : page * size]}
-            table = Table(table)
-
-            table.total = len(keys)
-            table.previous_page = page - 1 if page > 2 else None
-            table.next_page = page + 1 if page * size < len(keys) else None
-            table.page_size = len(table.table)
+            table = self.page_index(stmt, page, size)
 
         else:
             raise ValueError("Page and size must be specified")
 
+        return table
+
+    def page_index(self, stmt: Sequence[Sequence[Hashable]], page: int, size: int):
+        keys = sorted(tuple(set(product(*stmt, *self.keys[len(stmt) :])).intersection(self._raw_keys)))
+        table = {k: self.table.get(k) for k in keys[(page - 1) * size : page * size]}
+        table = Table(table)
+
+        table.total = len(keys)
+        table.previous_page = page - 1 if page > 2 else None
+        table.next_page = page + 1 if page * size < len(keys) else None
+        table.page_size = len(table.table)
         return table
 
     def to_dicts(self):

@@ -17,6 +17,7 @@ webtool = "^0.0.11"
 sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
 polars = "^1.17.0"
 fastapi-pagination = "^0.12.32"
+aiosqlite = "^0.20.0"
 
 
 [tool.poetry.group.dev.dependencies]
